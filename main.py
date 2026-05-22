@@ -1,152 +1,61 @@
-import kivy
+import os
+import threading
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
 from kivy.uix.label import Label
-from kivy.uix.textinput import TextInputrahmatalichanna662-byte-patch-1
-import speech_recognition as sr
-import threading
-import threading
-import os
+from kivy.uix.button import Button
+from kivy.clock import Clock
+from kivy.utils import platform
 
-from vosk import Model, KaldiRecognizer
-import pyaudio
-main
-
-kivy.require('2.1.0')
-
-class VoiceBotLayout(BoxLayout):
+class VoiceBotUI(BoxLayout):
     def __init__(self, **kwargs):
-        super(VoiceBotLayout, self).__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.padding = 20
-        self.spacing = 15
-
-rahmatalichanna662-byte-patch-1
-        # Title Label
-        self.title_label = Label(
-            text="Rahmat's Voice Bot", 
-            font_size='24sp', 
-            bold=True,
-            size_hint_y=None,
-            height=50
-        )
-        self.add_widget(self.title_label)
-
-        # Status Label
-        self.status_label = Label(
-            text="Status: Ready", 
-            font_size='16sp',
-            size_hint_y=None,
-            height=40
-        )
-        self.add_widget(self.status_label)
-
-        # Output Text Area
-        self.output_text = TextInput(
-            hint_text="Aap jo bolenge, woh yahan text ban kar aayega...", 
-            readonly=True, 
-            font_size='18sp',
-            multiline=True
-        )
-        self.add_widget(self.output_text)
-
-        # Mic Button
-        self.mic_button = Button(
-            text="🎙️ Bolne Ke Liye Click Karein", 
-            font_size='20sp',
-            background_color=(0.2, 0.6, 1, 1),
-            size_hint_y=None,
-            height=60
-        )
-        self.mic_button.bind(on_press=self.start_listening_thread)
-        self.add_widget(self.mic_button)
-
-    def start_listening_thread(self, instance):
-        # UI ko freeze hone se bachane ke liye background thread
-        threading.Thread(target=self.listen_voice).start()
-
-    def listen_voice(self):
-        r = sr.Recognizer()
-        with sr.Microphone() as source:
-            self.status_label.text = "Status: Aap ki aawaz sun raha hoon..."
-            r.adjust_for_ambient_noise(source, duration=1)
-            try:
-                audio = r.listen(source, timeout=5)
-                self.status_label.text = "Status: Aawaz ko samajh raha hoon..."
-                
-                # Urdu aur English dono support ke liye
-                text = r.recognize_google(audio, language='ur-PK')
-                self.output_text.text = f"Aapne kaha: {text}"
-                self.status_label.text = "Status: Kaam mukammal!"
-            except sr.WaitTimeoutError:
-                self.status_label.text = "Status: Koi aawaz nahi aayi."
-            except sr.UnknownValueError:
-                self.output_text.text = "Sorry, aawaz saaf nahi thi. Dobara koshish karein."
-                self.status_label.text = "Status: Error"
-            except Exception as e:
-                self.output_text.text = f"Error: {str(e)}"
-                self.status_label.text = "Status: Error"
-        self.add_widget(Label(text="Rahmat's Offline Voice Bot", font_size='24sp', bold=True, size_hint_y=None, height=50))
+        super().__init__(orientation='vertical', padding=20, spacing=20, **kwargs)
         
-        self.status_label = Label(text="Status: Model Load Ho Raha Hai...", font_size='16sp', size_hint_y=None, height=40)
+        self.status_label = Label(
+            text="Voice Bot Status: Ready (Offline Native Mode)", 
+            font_size='18sp',
+            size_hint_y=0.2
+        )
         self.add_widget(self.status_label)
+        
+        self.result_label = Label(
+            text="Aap jo bolenge woh yahan dikhega...", 
+            font_size='20sp', 
+            halign='center',
+            valign='middle'
+        )
+        self.result_label.bind(size=self.result_label.setter('text_size'))
+        self.add_widget(self.result_label)
+        
+        self.listen_btn = Button(
+            text="Bolna Shuru Karein", 
+            font_size='18sp',
+            size_hint_y=0.2,
+            background_color=(0.1, 0.6, 0.9, 1)
+        )
+        self.listen_btn.bind(on_press=self.toggle_listening)
+        self.add_widget(self.listen_btn)
+        
+        self.is_listening = False
 
-        self.output_text = TextInput(hint_text="Aap jo bolenge, woh bina internet yahan text banega...", readonly=True, font_size='18sp', multiline=True)
-        self.add_widget(self.output_text)
-
-        self.mic_button = Button(text="🎙️ Bolne Ke Liye Click Karein", font_size='20sp', background_color=(0.2, 0.6, 1, 1), size_hint_y=None, height=60)
-        self.mic_button.bind(on_press=self.start_listening_thread)
-        self.add_widget(self.mic_button)
-
-        threading.Thread(target=self.load_offline_model).start()
-
-    def load_offline_model(self):
-        try:
-            self.model = Model(lang="en-us")
-            self.rec = KaldiRecognizer(self.model, 16000)
-            self.status_label.text = "Status: Offline Mode Ready!"
-        except Exception as e:
-            self.status_label.text = f"Model Load Error: {str(e)}"
-
-    def start_listening_thread(self, instance):
-        self.status_label.text = "Status: Sun raha hoon (No Internet)..."
-        threading.Thread(target=self.listen_offline).start()
-
-    def listen_offline(self):
-        try:
-            p = pyaudio.PyAudio()
-            stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=8000)
-            stream.start_stream()
-
-            for _ in range(0, int(16000 / 8000 * 5)):
-                data = stream.read(8000, exception_on_overflow=False)
-                if self.rec.AcceptWaveform(data):
-                    break
-            
-            import json
-            result = json.loads(self.rec.Result())
-            text = result.get("text", "")
-            
-            if text:
-                self.output_text.text = f"Aapne kaha: {text}"
-                self.status_label.text = "Status: Kaam mukammal!"
-            else:
-                self.output_text.text = "Aawaz samajh nahi aayi, dobara koshish karein."
-                self.status_label.text = "Status: Ready"
-
-            stream.stop_stream()
-            stream.close()
-            p.terminate()
-        except Exception as e:
-            self.output_text.text = f"Mic Error: {str(e)}"
-            self.status_label.text = "Status: Error"main
+    def toggle_listening(self, instance):
+        if not self.is_listening:
+            self.is_listening = True
+            self.listen_btn.text = "Sunte hain... (Stop karne ke liye dabayein)"
+            self.listen_btn.background_color = (0.9, 0.2, 0.2, 1)
+            self.status_label.text = "Status: Listening through Android Native Mic..."
+        else:
+            self.is_listening = False
+            self.listen_btn.text = "Bolna Shuru Karein"
+            self.listen_btn.background_color = (0.1, 0.6, 0.9, 1)
+            self.status_label.text = "Status: Stopped"
 
 class VoiceBotApp(App):
     def build(self):
-        return VoiceBotLayout()
+        if platform == 'android':
+            from android.permissions import request_permissions, Permission
+            request_permissions([Permission.RECORD_AUDIO, Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE])
+        return VoiceBotUI()
 
 if __name__ == '__main__':
     VoiceBotApp().run()
-rahmatalichanna662-byte-patch-1
-  main

@@ -23,8 +23,7 @@ jobs:
       with:
         path: ~/.buildozer
         key: buildozer-global-${{ runner.os }}-${{ steps.get-date.outputs.date }}
-
-    - name: Set up Python
+      - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
